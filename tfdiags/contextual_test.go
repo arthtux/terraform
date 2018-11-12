@@ -139,6 +139,55 @@ baz "b" {
 	}
 }
 
+func TestReproBug(t *testing.T) {
+	cfg := `  most_recent = true
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-trusty-14.04-amd64-server-*"]
+  }
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+  owners = ["099720109477"]`
+
+	f, parseDiags := hclsyntax.ParseConfig([]byte(cfg), "test.tf", hcl.Pos{Line: 1, Column: 1})
+	if len(parseDiags) != 0 {
+		t.Fatal(parseDiags)
+	}
+
+	body := f.Body
+	var diags Diagnostics
+	diags = diags.Append(AttributeValue(
+		Error,
+		"owners.0",
+		"detail",
+		cty.Path{
+			cty.GetAttrStep{Name: "owners"},
+			cty.IndexStep{Key: cty.NumberIntVal(0)},
+		},
+	))
+
+	gotDiags := diags.InConfigBody(body)
+
+	wantRanges := map[string]*SourceRange{
+		`owners.0`: {
+			Filename: "test.tf",
+			Start:    SourcePos{Line: 10, Column: 12, Byte: 212},
+			End:      SourcePos{Line: 10, Column: 28, Byte: 228},
+		},
+	}
+	gotRanges := make(map[string]*SourceRange)
+	for _, diag := range gotDiags {
+		gotRanges[diag.Description().Summary] = diag.Source().Subject
+	}
+
+	for _, problem := range deep.Equal(gotRanges, wantRanges) {
+		t.Error(problem)
+	}
+
+}
+
 func TestGetAttribute(t *testing.T) {
 	path := cty.Path{
 		cty.GetAttrStep{Name: "foo"},

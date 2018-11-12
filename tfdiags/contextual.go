@@ -131,7 +131,7 @@ func (d *attributeDiagnostic) ElaborateFromConfigBody(body hcl.Body) Diagnostic 
 	// propagated to every place in Terraform, and this happens only in the
 	// presence of errors where performance isn't a concern.
 
-	traverse := d.attrPath[:len(d.attrPath)-1]
+	traverse := d.attrPath[:]
 	final := d.attrPath[len(d.attrPath)-1]
 
 	// If we have more than one step then we'll first try to traverse to
@@ -141,7 +141,6 @@ func (d *attributeDiagnostic) ElaborateFromConfigBody(body hcl.Body) Diagnostic 
 
 		switch tStep := step.(type) {
 		case cty.GetAttrStep:
-
 			var next cty.PathStep
 			if i < (len(traverse) - 1) {
 				next = traverse[i+1]
@@ -154,6 +153,7 @@ func (d *attributeDiagnostic) ElaborateFromConfigBody(body hcl.Body) Diagnostic 
 				indexVal = nextIndex.Key
 				indexType = indexVal.Type()
 				i++ // skip over the index on subsequent iterations
+				final = d.attrPath[len(d.attrPath)-2]
 			}
 
 			var blockLabelNames []string
@@ -184,6 +184,8 @@ func (d *attributeDiagnostic) ElaborateFromConfigBody(body hcl.Body) Diagnostic 
 				}
 			}
 			if len(filtered) == 0 {
+				// Step doesn't refer to a block
+				continue
 			}
 
 			switch indexType {
